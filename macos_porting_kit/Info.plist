@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.yourcompany.NVIDIADriver</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>NVIDIADriver</string>
+	<key>CFBundlePackageType</key>
+	<string>DEXT</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>IOKitPersonalities</key>
+	<dict>
+		<key>NVIDIA_GPU_Driver_Personality</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.yourcompany.NVIDIADriver</string>
+			<key>IOClass</key>
+			<string>NVIDIADriver</string>
+			<key>IOProviderClass</key>
+			<string>IOPCIDevice</string>
+			<key>IOPCIMatch</key>
+			<string>0xYYYY10de</string>
+			<key>IOUserClientClass</key>
+			<string>NVIDIADriverUserClient</string>
+		</dict>
+	</dict>
+</dict>
+</plist>
