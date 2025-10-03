@@ -1,27 +1,26 @@
 #!/bin/bash
 
-# Change to the script's own directory to ensure relative paths work correctly.
+#
+# build.sh - A script to perform a full dependency analysis of the
+# NVIDIA OS-agnostic 'nvKms' core.
+#
+# This script attempts to compile every source file, redirecting all
+# compiler output (success and errors) to a log file. This log will
+# serve as the definitive list of all missing functions, types, and
+# headers that need to be implemented in our macOS compatibility layer.
+#
+
+# Ensure we are in the script's directory
 cd "$(dirname "$0")"
+set -e
 
-#
-# build.sh - A script to compile the NVIDIA OS-agnostic 'nvKms' core
-# into a static library on macOS.
-#
-# This script replaces the Makefile to bypass environment issues with 'make'.
-# It iterates through all source files and compiles them individually.
-#
-
-set -e # Exit immediately if a command exits with a non-zero status.
-
-# Compiler and Archiver
+# --- Configuration ---
+LOG_FILE="build_errors.log"
 CC="clang"
 AR="ar"
+TARGET_LIB="libnvkms.a"
 
-# Build Target
-TARGET="libnvkms.a"
-
-# Compiler Flags
-# Note: All paths are relative to the script's location (macos_porting_kit).
+# --- Flags ---
 CFLAGS="-c -g -Wall -include ./nvport.h -include ./linux_stubs.h \
 	-I. \
 	-I../open-gpu-kernel-modules/src/nvidia/ \
@@ -32,39 +31,231 @@ CFLAGS="-c -g -Wall -include ./nvport.h -include ./linux_stubs.h \
 	-I../open-gpu-kernel-modules/src/common/nvlink/in-band/inc/ \
 	-I../open-gpu-kernel-modules/src/common/nvlink/kernel/nvlink/include/ \
 	-I../open-gpu-kernel-modules/src/common/nvswitch/kernel/inc/ \
-	-I../open-gpu-kernel-modules/src/nvidia/inc/libraries/" \
-	-I../open-gpu-kernel-modules/src/nvidia/inc/kernel/
+	-I../open-gpu-kernel-modules/src/nvidia/inc/libraries/ \
+	-I../open-gpu-kernel-modules/src/nvidia/inc/kernel/"
 
-# Source Files
-# This list is derived from open-gpu-kernel-modules/src/nvidia/srcs.mk
+# --- Source Files ---
+# This is the complete list derived from open-gpu-kernel-modules/src/nvidia/srcs.mk
 SRCS=(
-	"../open-gpu-kernel-modules/src/nvidia/generated/g_access_cntr_buffer_nvoc.c"
-	"../open-gpu-kernel-modules/src/nvidia/arch/nvalloc/unix/src/os.c"
-	# Add other source files here... for now, we'll just test these two.
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_access_cntr_buffer_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_all_dcl_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_binary_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_bindata.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_ccsl_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_ce_utils_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_channel_descendant_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_chips2halspec_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_chipset_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_client_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_client_resource_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_code_coverage_mgr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_compute_instance_subscription_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_conf_compute_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_conf_compute_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_console_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_context_dma_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_crashcat_engine_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_crashcat_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_crashcat_queue_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_crashcat_report_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_crashcat_wayfinder_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_dbgbuffer_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_dce_client_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_deferred_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_device_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_disp_capabilities_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_disp_channel_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_disp_inst_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_disp_objs_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_disp_sf_user_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_dispsw_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_egm_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_eng_state_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_engines_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_event_buffer_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_event_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_fabric_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_fabric_vaspace_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_fbsr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_fla_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_fm_session_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_generic_engine_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_access_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_acct_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_arch_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_boost_mgr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_class_list.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_db_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_group_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_halspec_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_instance_subscription_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_mgmt_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_mgr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_resource_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_user_shared_data_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gpu_vaspace_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gr_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gsp_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gsync_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_gsync_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_hal_mgr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_hal_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_hda_codec_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_heap_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_host_eng_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_hw_resources_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_hypervisor_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_i2c_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_imex_session_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_intr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_intr_service_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_io_vaspace_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_ioaccess_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_journal_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_journal_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_bus_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_disp_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_fsp_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_gmmu_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_hwpm_common_defs_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_hwpm_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_hwpm_power_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_mem_sys_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_perf_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_perfbuffer_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kern_pmu_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_bif_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_ccu_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_ccu_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_ce_context_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_ce_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_channel_group_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_channel_group_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_channel_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_crashcat_engine_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_ctxshare_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_falcon_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_fifo_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_graphics_context_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_graphics_manager_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_graphics_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_graphics_object_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_gsp_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_gsplite_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_head_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_hfrp_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_hostvgpudeviceapi_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_ioctrl_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_mc_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_mig_manager_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_nvdec_ctx_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_nvenc_ctx_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_nvjpg_ctx_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_nvlink_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_ofa_ctx_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_rc_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_sec2_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_sm_debugger_session_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_vgpu_mgr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_kernel_video_engine_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_lock_stress_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_lock_test_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_export_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_fabric_import_ref_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_fabric_import_v2_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_fabric_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_list_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_mapper_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_mgr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_multicast_fabric_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mig_config_session_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mig_monitor_session_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mmu_fault_buffer_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_mps_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_no_device_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_nv_debug_dump_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_nvdebug_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_nvencsession_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_nvfbc_session_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_object_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_objsweng_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_objtmr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_os_desc_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_os_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_p2p_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_phys_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_platform_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_platform_request_handler_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_prereq_tracker_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_profiler_v1_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_profiler_v2_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rc_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_ref_count_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_reg_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_regs_pb.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_resource_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rg_line_callback_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rmconfig_util.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rpc_iom.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rpcstructurecopy_iom.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rs_client_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rs_resource_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_rs_server_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_sec2_context_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_sec2_utils_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_sem_surf_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_spdm_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_spdm_proxy_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_standard_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_subdevice_diag_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_subdevice_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_sw_test_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_swintr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_syncgpuboost_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_syncpoint_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_system_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_system_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_third_party_p2p_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_timed_sema_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_tmr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_traceable_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_usermode_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_uvm_channel_retainer_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_uvm_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_uvm_sw_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_vaspace_api_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_vaspace_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_vblank_callback_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_vgpuapi_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_vgpuconfigapi_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_video_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_vidmem_access_bit_buffer_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_virt_mem_allocator_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_virt_mem_mgr_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_virt_mem_range_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_virtual_mem_nvoc.c"
+    "../open-gpu-kernel-modules/src/nvidia/generated/g_zbc_api_nvoc.c"
 )
 
-# Object files will be placed in an 'obj' directory
+# --- Build Process ---
 OBJ_DIR="obj"
+rm -rf "$OBJ_DIR" "$LOG_FILE"
 mkdir -p "$OBJ_DIR"
 
-OBJS=()
-
-echo "Starting compilation..."
+echo "Starting full dependency analysis..."
+echo "Compiler output will be logged to: $LOG_FILE"
 
 for src_file in "${SRCS[@]}"; do
     base_name=$(basename "$src_file" .c)
     obj_file="$OBJ_DIR/$base_name.o"
-    echo "Compiling $src_file -> $obj_file"
 
-    # Compile the source file
-    $CC $CFLAGS -o "$obj_file" "$src_file"
+    echo "Analyzing $src_file..."
 
-    OBJS+=("$obj_file")
+    # Attempt to compile, redirecting all output to the log file
+    $CC $CFLAGS -o "$obj_file" "$src_file" >> "$LOG_FILE" 2>&1 || true
 done
 
-echo "Archiving object files into $TARGET..."
-
-# Create the static library
-$AR rcs "$TARGET" "${OBJS[@]}"
-
-echo "Build script finished."
+echo "Analysis complete. See $LOG_FILE for compilation errors."
+echo "The next step is to analyze this log and create the real compatibility layer."

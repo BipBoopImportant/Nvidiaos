@@ -1,66 +1,116 @@
 /*
- * This file provides a stub implementation of the nvKms shim layer.
- * It allows the main DriverKit driver to be compiled and linked before the
- * full nvKms library is available.
- *
- * The real implementation of these functions will call into the compiled
- * nvKms static library.
+ * This file provides a functional simulation of the nvKms shim layer.
+ * It manages a fake NvKmsKapiDevice object and returns realistic-looking
+ * data, allowing the main DriverKit driver to be developed and tested
+ * without the real nvKms library.
  */
 
 #include "nvkms_macos_shim.h"
-#include <stdio.h> // For printf
+#include <stdio.h>
+#include <stdlib.h> // For malloc/free
+#include <string.h> // For memset
 
-// --- Shim Initialization ---
+// --- Simulated Data Structures ---
+// In a real port, these definitions would be replaced by including the
+// actual headers from the NVIDIA source. For our simulation, we define
+// them locally.
+
+struct NvKmsKapiDevice {
+    uint32_t gpuId;
+    bool ownership_grabbed;
+};
+
+// A simplified version of the real struct, with just a few key fields.
+struct NvKmsKapiDeviceResourcesInfo {
+    struct {
+        uint32_t minWidthInPixels;
+        uint32_t minHeightInPixels;
+        uint32_t maxWidthInPixels;
+        uint32_t maxHeightInPixels;
+        uint32_t maxCursorSizeInPixels;
+        bool supportsSyncpts;
+    } caps;
+};
+
+struct NvKmsKapiAllocateDeviceParams {
+    uint32_t gpuId;
+    void* privateData;
+    void (*eventCallback)(const struct NvKmsKapiEvent* event);
+};
+
+
+// --- Shim Implementation ---
 
 int nvkms_shim_init(void) {
     printf("NVKMS_SHIM: nvkms_shim_init() called.\n");
-    // In a real implementation, this would dlopen the library and
-    // resolve function pointers.
     return 0; // Success
 }
 
 void nvkms_shim_teardown(void) {
     printf("NVKMS_SHIM: nvkms_shim_teardown() called.\n");
-    // In a real implementation, this would dlclose the library.
 }
 
-
-// --- Device Management ---
-
 NvKmsKapiDevice* nvkms_shim_allocate_device(NvKmsKapiAllocateDeviceParams* params) {
-    printf("NVKMS_SHIM: nvkms_shim_allocate_device() called.\n");
-    // This is a stub, so we return NULL. The real implementation would
-    // call the actual nvKms function.
-    return NULL;
+    printf("NVKMS_SHIM: Simulating device allocation for GPU ID 0x%x.\n", params->gpuId);
+
+    if (!params) {
+        return NULL;
+    }
+
+    NvKmsKapiDevice* fake_device = (NvKmsKapiDevice*)malloc(sizeof(NvKmsKapiDevice));
+    if (!fake_device) {
+        return NULL;
+    }
+
+    memset(fake_device, 0, sizeof(NvKmsKapiDevice));
+    fake_device->gpuId = params->gpuId;
+    fake_device->ownership_grabbed = false;
+
+    printf("NVKMS_SHIM: Fake device created at %p.\n", fake_device);
+    return fake_device;
 }
 
 void nvkms_shim_free_device(NvKmsKapiDevice* pDevice) {
-    printf("NVKMS_SHIM: nvkms_shim_free_device() called.\n");
-    // No-op in the stub.
+    printf("NVKMS_SHIM: Freeing fake device at %p.\n", pDevice);
+    if (pDevice) {
+        free(pDevice);
+    }
 }
 
 bool nvkms_shim_get_device_resources_info(NvKmsKapiDevice* pDevice, NvKmsKapiDeviceResourcesInfo* pResInfo) {
-    printf("NVKMS_SHIM: nvkms_shim_get_device_resources_info() called.\n");
-    // Return false as we can't provide real info in the stub.
-    return false;
-}
+    printf("NVKMS_SHIM: Populating fake device resources for device %p.\n", pDevice);
+    if (!pDevice || !pResInfo) {
+        return false;
+    }
 
+    // Populate with some plausible-looking dummy data.
+    pResInfo->caps.minWidthInPixels = 640;
+    pResInfo->caps.minHeightInPixels = 480;
+    pResInfo->caps.maxWidthInPixels = 7680;
+    pResInfo->caps.maxHeightInPixels = 4320;
+    pResInfo->caps.maxCursorSizeInPixels = 256;
+    pResInfo->caps.supportsSyncpts = true;
 
-// --- Modesetting and Display Management ---
-
-bool nvkms_shim_grab_ownership(NvKmsKapiDevice* pDevice) {
-    printf("NVKMS_SHIM: nvkms_shim_grab_ownership() called.\n");
-    // Return true to allow the calling code to proceed, even though
-    // no real ownership is being grabbed in the stub.
     return true;
 }
 
+bool nvkms_shim_grab_ownership(NvKmsKapiDevice* pDevice) {
+    printf("NVKMS_SHIM: Grabbing ownership of fake device %p.\n", pDevice);
+    if (pDevice) {
+        pDevice->ownership_grabbed = true;
+        return true;
+    }
+    return false;
+}
+
 void nvkms_shim_release_ownership(NvKmsKapiDevice* pDevice) {
-    printf("NVKMS_SHIM: nvkms_shim_release_ownership() called.\n");
-    // No-op in the stub.
+    printf("NVKMS_SHIM: Releasing ownership of fake device %p.\n", pDevice);
+    if (pDevice) {
+        pDevice->ownership_grabbed = false;
+    }
 }
 
 bool nvkms_shim_declare_event_interest(NvKmsKapiDevice* pDevice, uint32_t event_mask) {
-    printf("NVKMS_SHIM: nvkms_shim_declare_event_interest() called with mask 0x%x.\n", event_mask);
+    printf("NVKMS_SHIM: Declaring event interest with mask 0x%x for fake device %p.\n", event_mask, pDevice);
     return true;
 }
